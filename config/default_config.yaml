@@ -1,0 +1,24 @@
+github:
+  token: ${GITHUB_TOKEN}
+  api_url: "https://api.github.com"
+
+ollama:
+  endpoint: "http://localhost:11434"
+  model: "phi4"
+  temperature: 0.1
+  max_tokens: 2048
+
+review:
+  max_files: 50
+  max_lines_per_file: 1000
+  include_context_lines: 3
+  filter_patterns:
+    - "*.lock"
+    - "*.min.js"
+    - "*.generated.*"
+
+output:
+  format: "console"  # console, json, markdown
+  file: null
+  include_summary: true
+  show_confidence: true 
