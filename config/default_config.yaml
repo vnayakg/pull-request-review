@@ -1,12 +1,29 @@
+llm:
+  type: gemini  # ollama, openai, gemini
+
 github:
   token: ${GITHUB_TOKEN}
   api_url: "https://api.github.com"
 
 ollama:
   endpoint: "http://localhost:11434"
-  model: "phi4"
+  model: "codellama:7b"
   temperature: 0.1
   max_tokens: 2048
+
+openai:
+  api_key: ${OPENAI_API_KEY}
+  model: "gpt-3.5-turbo"
+  temperature: 0.1
+  max_tokens: 2048
+  api_base: null
+
+gemini:
+  api_key: ${GEMINI_API_KEY}
+  model: "gemini-2.0-flash"
+  temperature: 0.1
+  max_tokens: 2048
+  api_base: null
 
 review:
   max_files: 50

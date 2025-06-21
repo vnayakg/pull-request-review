@@ -3,23 +3,25 @@ from rich import print
 from .config import Config
 from .github_client import GitHubClient
 from .diff_parser import DiffParser
-from .ollama_client import OllamaClient
 from .prompt_templates import render_review_prompt
 from .output_formatter import format_console, format_output
+from .llm_client import get_llm_client
 import yaml
 
 @click.command()
 @click.argument('pr_url')
 @click.option('--config', '-c', 'config_path', default=None, help='Path to configuration YAML file')
-@click.option('--model', default=None, help='Ollama model to use')
+@click.option('--model', default=None, help='LLM model to use (overrides config)')
 @click.option('--output', default=None, help='Output file path')
 @click.option('--format', 'output_format', default=None, type=click.Choice(['console', 'json', 'markdown']), help='Output format')
 def main(pr_url, config_path, model, output, output_format):
-    """Review a GitHub pull request using a local LLM via Ollama."""
+    """Review a GitHub pull request using a local or remote LLM."""
     config = Config(config_path)
-    # Override config with CLI options if provided
     if model:
-        config.config['ollama']['model'] = model
+        # Override model for all LLMs
+        for section in ['ollama', 'openai', 'gemini']:
+            if section in config.config:
+                config.config[section]['model'] = model
     if output:
         config.config['output']['file'] = output
     if output_format:
@@ -54,18 +56,11 @@ def main(pr_url, config_path, model, output, output_format):
         if len(summary) > 5:
             print(f"...and {len(summary)-5} more files.")
         # Prepare prompt for LLM
-        ollama_cfg = config.get('ollama')
-        ollama_client = OllamaClient(
-            endpoint=ollama_cfg['endpoint'],
-            model=ollama_cfg['model'],
-            temperature=ollama_cfg.get('temperature', 0.1),
-            max_tokens=ollama_cfg.get('max_tokens', 2048)
-        )
-        # For MVP, use the first N files' diffs as context
+        llm_client = get_llm_client(config)
         diff_summary = '\n'.join(diff.splitlines()[:1000])
         prompt = render_review_prompt(pr_meta, files, diff_summary)
-        print('[bold yellow]Sending prompt to LLM...[/bold yellow]')
-        review_yaml = ollama_client.generate_review(prompt)
+        print(f'[bold yellow]Sending prompt to LLM ({config.get("llm.type")})...[/bold yellow]')
+        review_yaml = llm_client.generate_review(prompt)
         # Parse YAML output from LLM
         try:
             review_obj = yaml.safe_load(review_yaml)
