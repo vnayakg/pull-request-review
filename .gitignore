@@ -71,4 +71,5 @@ coverage.xml
 .env
 
 # YAML config overrides
-config/*.local.yaml 
+config/*.local.yaml
+.rag_cache/

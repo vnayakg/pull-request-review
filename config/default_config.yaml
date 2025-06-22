@@ -25,6 +25,37 @@ gemini:
   max_tokens: 2048
   api_base: null
 
+# RAG configuration for repository context
+rag:
+  enabled: true
+  embedder:
+    model: "sentence-transformers/all-MiniLM-L6-v2"  # Local embedding model
+    batch_size: 32
+    max_length: 512
+  retriever:
+    top_k: 10  # Number of relevant chunks to retrieve
+    similarity_threshold: 0.7
+  text_splitter:
+    chunk_size: 500
+    chunk_overlap: 100
+    split_by: "token"  # token, character, or sentence
+  storage:
+    type: "faiss"  # faiss, memory
+    cache_dir: "./.rag_cache"
+  context:
+    include_file_structure: true
+    include_readme: true
+    include_documentation: true
+    max_files_to_index: 1000
+    exclude_patterns:
+      - "*.lock"
+      - "*.min.js"
+      - "*.generated.*"
+      - "node_modules/*"
+      - ".git/*"
+      - "venv/*"
+      - "__pycache__/*"
+
 review:
   max_files: 50
   max_lines_per_file: 1000
@@ -35,7 +66,7 @@ review:
     - "*.generated.*"
 
 output:
-  format: "console"  # console, json, markdown
+  format: "markdown"  # console, json, markdown
   file: null
   include_summary: true
   show_confidence: true 
