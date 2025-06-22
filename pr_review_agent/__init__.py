@@ -3,6 +3,6 @@ PR Review Agent package: CLI tool for reviewing GitHub PRs using a local LLM via
 """ 
 
 from .cli import main
-from .rag_system import RAGSystem
+from .rag import RAGSystem # Corrected import
 
 __version__ = "1.0.0" 
