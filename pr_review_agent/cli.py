@@ -6,7 +6,7 @@ from .diff_parser import DiffParser
 from .prompt_templates import render_review_prompt, render_contextual_review_prompt
 from .output_formatter import format_console, format_output, format_fallback_text
 from .llm_client import get_llm_client
-from .rag_system import RAGSystem
+from .rag import RAGSystem # Updated import
 import yaml
 
 @click.command()

@@ -3,7 +3,8 @@ import pickle
 import numpy as np
 import faiss
 from typing import List, Dict, Any, Tuple, Optional
-from .rag_text_splitter import TextChunk
+from .text_splitter import TextChunk
+from .embedder import RAGEmbedder # Import for type hinting
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,9 +12,10 @@ logger = logging.getLogger(__name__)
 class RAGRetriever:
     """Handles similarity search for RAG system using FAISS."""
     
-    def __init__(self, top_k: int = 10, similarity_threshold: float = 0.7):
+    def __init__(self, top_k: int = 10, similarity_threshold: float = 0.7, max_context_length: int = 2000):
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
+        self.max_context_length = max_context_length
         self.index = None
         self.chunks = []
         self.embeddings = None
@@ -58,7 +60,7 @@ class RAGRetriever:
         
         return results
     
-    def search_by_text(self, query_text: str, embedder) -> List[Tuple[TextChunk, float]]:
+    def search_by_text(self, query_text: str, embedder: RAGEmbedder) -> List[Tuple[TextChunk, float]]:
         """Search for similar chunks given a query text."""
         query_embedding = embedder.embed_single_text(query_text)
         return self.search(query_embedding)
@@ -97,8 +99,8 @@ class RAGRetriever:
             logger.error(f"Failed to load index from {filepath}: {e}")
             raise
     
-    def get_relevant_context(self, query: str, embedder, max_context_length: int = 2000) -> str:
-        """Get relevant context as a formatted string for the query."""
+    def get_relevant_context(self, query: str, embedder: RAGEmbedder) -> str:
+        """Get relevant context as a formatted string for the query, using instance's max_context_length."""
         results = self.search_by_text(query, embedder)
         
         if not results:
@@ -110,7 +112,7 @@ class RAGRetriever:
         for chunk, score in results:
             chunk_text = f"File: {chunk.file_path} (lines {chunk.start_line}-{chunk.end_line})\n{chunk.text}\n"
             
-            if current_length + len(chunk_text) > max_context_length:
+            if current_length + len(chunk_text) > self.max_context_length:
                 break
             
             context_parts.append(chunk_text)

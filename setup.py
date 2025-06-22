@@ -32,7 +32,7 @@ setup(
     entry_points={
         "console_scripts": [
             "pr-review-agent=pr_review_agent.cli:main",
-            "pr-rag=pr_review_agent.rag_cli:rag",
+            "pr-rag=pr_review_agent.rag.commands:rag", # Updated path
         ],
     },
     include_package_data=True,

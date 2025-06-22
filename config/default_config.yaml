@@ -35,6 +35,7 @@ rag:
   retriever:
     top_k: 10  # Number of relevant chunks to retrieve
     similarity_threshold: 0.7
+    max_context_length: 2000 # Max characters for combined retrieved context
   text_splitter:
     chunk_size: 500
     chunk_overlap: 100

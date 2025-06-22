@@ -2,14 +2,15 @@ import os
 import hashlib
 import tempfile
 import subprocess
+import re # Added for _extract_diff_summary
 from typing import List, Dict, Any, Optional
 import logging
 from pathlib import Path
 
-from .rag_embedder import RAGEmbedder
-from .rag_retriever import RAGRetriever
-from .rag_repository_processor import RAGRepositoryProcessor
-from .rag_text_splitter import TextChunk
+from .embedder import RAGEmbedder
+from .retriever import RAGRetriever
+from .repository_processor import RAGRepositoryProcessor
+from .text_splitter import TextChunk
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,11 @@ class RAGSystem:
             max_length=self.rag_config.get('embedder', {}).get('max_length', 512)
         )
         
+        retriever_config = self.rag_config.get('retriever', {})
         self.retriever = RAGRetriever(
-            top_k=self.rag_config.get('retriever', {}).get('top_k', 10),
-            similarity_threshold=self.rag_config.get('retriever', {}).get('similarity_threshold', 0.7)
+            top_k=retriever_config.get('top_k', 10),
+            similarity_threshold=retriever_config.get('similarity_threshold', 0.7),
+            max_context_length=retriever_config.get('max_context_length', 2000)
         )
         
         self.repository_processor = RAGRepositoryProcessor(
@@ -141,53 +144,131 @@ class RAGSystem:
                 logger.warning("RAG index not found. Call prepare_repository_context() first.")
                 return ""
         
-        # Extract relevant files from diff
-        relevant_files = self.repository_processor.get_relevant_files_for_diff(diff_content, repo_path)
-        
-        if not relevant_files:
+        # Ensure the main repository index is loaded and available in self.retriever
+        if not hasattr(self.retriever, 'index') or self.retriever.index is None:
+            # Attempt to load it if cache path seems valid
+            if os.path.exists(f"{cache_path}.faiss"):
+                logger.info(f"Main index not loaded for {repo_url}, attempting to load from {cache_path}")
+                try:
+                    self.retriever.load_index(cache_path)
+                except Exception as e:
+                    logger.error(f"Failed to load index for {repo_url} from {cache_path}: {e}")
+                    return "" # Or handle error appropriately
+            else:
+                logger.warning(f"RAG index not found for {repo_url} at {cache_path}. Call prepare_repository_context() first.")
+                return ""
+
+        # Extract a summary from the diff content to use as a query
+        diff_summary_query = self._extract_diff_summary(diff_content)
+
+        if not diff_summary_query:
+            logger.info("Empty diff summary, cannot retrieve context.")
             return ""
-        
-        # Get context for relevant files
-        context_chunks = self.repository_processor.get_context_for_files(relevant_files, repo_path)
-        
-        if not context_chunks:
-            return ""
-        
-        # Create embeddings for context chunks
-        context_texts = [chunk.text for chunk in context_chunks]
-        context_embeddings = self.embedder.embed_texts(context_texts)
-        
-        # Create temporary retriever for context
-        temp_retriever = RAGRetriever(
-            top_k=self.rag_config.get('retriever', {}).get('top_k', 10),
-            similarity_threshold=self.rag_config.get('retriever', {}).get('similarity_threshold', 0.7)
+
+        logger.info(f"Querying main index with diff summary for {repo_url}")
+        # Use the main retriever (self.retriever) to get context
+        # The max_context_length can be made configurable later (as per plan step 3)
+        relevant_context = self.retriever.get_relevant_context(
+            query=diff_summary_query,
+            embedder=self.embedder
+            # max_context_length can be passed here if configured
         )
-        temp_retriever.build_index(context_chunks, context_embeddings)
         
-        # Get relevant context for the diff
-        diff_summary = self._extract_diff_summary(diff_content)
-        relevant_context = temp_retriever.get_relevant_context(diff_summary, self.embedder)
-        
+        if relevant_context:
+            logger.info(f"Retrieved {len(relevant_context)} characters of context for the diff.")
+        else:
+            logger.info("No relevant context found for the diff summary in the main index.")
+
         return relevant_context
     
-    def _extract_diff_summary(self, diff_content: str) -> str:
-        """Extract a summary of the diff for context retrieval."""
-        lines = diff_content.split('\n')
-        summary_lines = []
+    def _extract_diff_summary(self, diff_content: str, max_summary_length: int = 1000) -> str:
+        """
+        Extract a more meaningful summary of the diff for context retrieval.
+        Focuses on changed lines and their immediate context, including function/class definitions.
+        """
+        summary_parts = []
+        current_file = None
+        hunk_lines_collected = 0 # Counter for lines collected within the current hunk
+
+        # Regex to identify potential function/class definition lines
+        definition_re = re.compile(r'^\s*(def|class)\s+([a-zA-Z_][a-zA-Z0-9_]*)')
+        file_header_re = re.compile(r'^diff --git a/(.+?) b/(.+)$')
+        hunk_header_re = re.compile(r'^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@(.*)$') # Capture content after
+
+        lines = diff_content.splitlines()
         
+        # First pass: collect file names mentioned in the diff
+        changed_files_info = []
         for line in lines:
+            file_match = file_header_re.match(line)
+            if file_match:
+                changed_files_info.append(f"File changed: {file_match.group(2)}")
+
+        if changed_files_info:
+            summary_parts.append("Changes in files: " + ", ".join(changed_files_info))
+
+        context_window = 2  # Number of context lines to include around a change
+
+        for i, line in enumerate(lines):
+            if len(" ".join(summary_parts)) > max_summary_length:
+                break
+
+            hunk_match = hunk_header_re.match(line)
+            if hunk_match:
+                hunk_context = hunk_match.group(1).strip()
+                if hunk_context:
+                    summary_parts.append(f"Change context: {hunk_context}")
+                hunk_lines_collected = 0 # Reset for new hunk
+                # Look for definitions before the hunk
+                for j in range(max(0, i - 5), i):
+                    def_match = definition_re.match(lines[j])
+                    if def_match:
+                        summary_parts.append(f"In {def_match.group(1)} {def_match.group(2)}:")
+                        break
+                continue
+
+            # Prioritize added/removed lines and their immediate context
             if line.startswith('+') and not line.startswith('+++'):
-                # Added lines
-                summary_lines.append(line[1:].strip())
+                if hunk_lines_collected < 15 : # Limit lines per hunk
+                    # Add context before
+                    for k in range(max(0, i - context_window), i):
+                        if lines[k].startswith(' ') and lines[k] not in summary_parts[-context_window:]: # Avoid duplicate context
+                            summary_parts.append(lines[k].strip())
+                    summary_parts.append(f"Added: {line[1:].strip()}")
+                    hunk_lines_collected +=1
             elif line.startswith('-') and not line.startswith('---'):
-                # Removed lines
-                summary_lines.append(line[1:].strip())
-            elif line.startswith('@@'):
-                # Hunk headers
-                summary_lines.append(line.strip())
-        
-        return " ".join(summary_lines[:50])  # Limit to first 50 lines
-    
+                if hunk_lines_collected < 15 : # Limit lines per hunk
+                     # Add context before
+                    for k in range(max(0, i - context_window), i):
+                         if lines[k].startswith(' ') and lines[k] not in summary_parts[-context_window:]: # Avoid duplicate context
+                            summary_parts.append(lines[k].strip())
+                    summary_parts.append(f"Removed: {line[1:].strip()}")
+                    hunk_lines_collected +=1
+            elif line.startswith(' '): # Context line
+                # Check if this context line is near a change that was just added
+                is_near_added_change = any(p.startswith("Added:") for p in summary_parts[-2:])
+                is_near_removed_change = any(p.startswith("Removed:") for p in summary_parts[-2:])
+                if (is_near_added_change or is_near_removed_change) and hunk_lines_collected < 15 and line.strip() not in summary_parts[-context_window:]:
+                    summary_parts.append(line.strip())
+                    # hunk_lines_collected +=1 # Context lines don't count as much towards the hunk limit
+
+            # Capture definitions if they appear
+            def_match = definition_re.match(line)
+            if def_match and hunk_lines_collected < 15:
+                summary_parts.append(f"Context: {def_match.group(1)} {def_match.group(2)}")
+
+
+        final_summary = " ".join(summary_parts)
+        if len(final_summary) > max_summary_length:
+            # A simple way to truncate, might cut mid-word.
+            # More sophisticated truncation (e.g., by tokens) could be added if needed.
+            cutoff_index = final_summary.rfind(' ', 0, max_summary_length)
+            if cutoff_index == -1: # no space found
+                return final_summary[:max_summary_length]
+            return final_summary[:cutoff_index]
+
+        return final_summary
+
     def get_context_for_query(self, query: str, repo_url: str, branch: str = "main") -> str:
         """Get relevant context for a specific query."""
         if not self.rag_config.get('enabled', True):
@@ -206,7 +287,7 @@ class RAGSystem:
         
         return self.retriever.get_relevant_context(query, self.embedder)
     
-    def clear_cache(self, repo_url: str = None, branch: str = "main"):
+    def clear_cache(self, repo_url: Optional[str] = None, branch: str = "main") -> None:
         """Clear RAG cache for a specific repository or all repositories."""
         if repo_url:
             repo_hash = self._get_repo_hash(repo_url, branch)

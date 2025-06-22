@@ -1,10 +1,12 @@
 import os
 import glob
 import fnmatch
+import re # Added import
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import logging
-from .rag_text_splitter import RAGTextSplitter, TextChunk
+from .text_splitter import RAGTextSplitter, TextChunk
+from .constants import READABLE_EXTENSIONS # Import the constant
 
 logger = logging.getLogger(__name__)
 
@@ -35,25 +37,7 @@ class RAGRepositoryProcessor:
     
     def get_readable_files(self, repo_path: str) -> List[str]:
         """Get list of readable files from repository."""
-        readable_extensions = {
-            # Code files
-            '.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.cpp', '.c', '.h', '.hpp',
-            '.cs', '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.scala', '.clj',
-            # Web files
-            '.html', '.css', '.scss', '.sass', '.xml', '.json', '.yaml', '.yml',
-            # Documentation
-            '.md', '.txt', '.rst', '.adoc', '.tex',
-            # Config files
-            '.toml', '.ini', '.cfg', '.conf', '.properties',
-            # Shell scripts
-            '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat',
-            # Docker and deployment
-            'Dockerfile', '.dockerfile', 'docker-compose.yml', 'docker-compose.yaml',
-            # Package managers
-            'requirements.txt', 'package.json', 'pom.xml', 'build.gradle', 'Cargo.toml',
-            'go.mod', 'composer.json', 'Gemfile', 'pubspec.yaml'
-        }
-        
+        # Uses READABLE_EXTENSIONS from .constants
         files = []
         file_count = 0
         
@@ -73,7 +57,7 @@ class RAGRepositoryProcessor:
                 
                 # Check if file has readable extension or is a known config file
                 file_ext = os.path.splitext(filename)[1].lower()
-                if file_ext in readable_extensions or filename in readable_extensions:
+                if file_ext in READABLE_EXTENSIONS or filename in READABLE_EXTENSIONS: # Use the imported constant
                     files.append(file_path)
                     file_count += 1
         
@@ -162,7 +146,7 @@ class RAGRepositoryProcessor:
     
     def get_relevant_files_for_diff(self, diff_content: str, repo_path: str) -> List[str]:
         """Get list of files mentioned in the diff."""
-        import re
+        # import re # Moved to top of file
         
         # Extract file paths from diff
         file_pattern = r'^diff --git a/(.+) b/(.+)$'

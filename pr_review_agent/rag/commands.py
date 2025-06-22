@@ -1,7 +1,7 @@
 import click
 from rich import print
-from .config import Config
-from .rag_system import RAGSystem
+from ..config import Config # Corrected import for parent directory
+from . import RAGSystem # Corrected import to use rag package's __init__.py
 
 @click.group()
 def rag():
