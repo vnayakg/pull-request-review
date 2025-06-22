@@ -56,6 +56,61 @@ pr-rag clear-cache
 pr-rag status
 ```
 
+## Development with Makefile
+
+This project includes a comprehensive Makefile for common development tasks:
+
+```bash
+# Show all available commands
+make help
+
+# Set up development environment
+make full-setup
+
+# Run tests
+make test
+
+# Run tests with coverage
+make test-coverage
+
+# Format code
+make format
+
+# Run linting
+make lint
+
+# Run demos
+make demo
+make demo-output
+
+# Clean up
+make clean
+make clean-cache
+
+# Build distribution
+make build
+```
+
+### Quick Development Workflow
+
+```bash
+# 1. Set up everything
+make full-setup
+
+# 2. Activate virtual environment
+source venv/bin/activate
+
+# 3. Run tests
+make test
+
+# 4. Try the demo
+make demo
+
+# 5. Format and lint before committing
+make format
+make lint
+```
+
 ## Configuration
 
 Create a `config.yaml` file or use environment variables:
@@ -186,7 +241,27 @@ pr-review-agent https://github.com/owner/repo/pull/123 --rag --clear-cache
 ### Running Tests
 
 ```bash
-pytest tests/
+# Run all tests
+make test
+
+# Run with coverage
+make test-coverage
+
+# Run with verbose output
+make test-verbose
+```
+
+### Code Quality
+
+```bash
+# Format code
+make format
+
+# Run linting
+make lint
+
+# Check project health
+make health
 ```
 
 ### Project Structure
@@ -208,7 +283,10 @@ pull-request-llm/
 ├── config/
 │   └── default_config.yaml   # Default configuration
 ├── tests/                    # Test suite
-└── requirements.txt          # Dependencies
+├── requirements.txt          # Production dependencies
+├── requirements-dev.txt      # Development dependencies
+├── Makefile                  # Development tasks
+└── README.md                 # This file
 ```
 
 ## Contributing
@@ -216,9 +294,7 @@ pull-request-llm/
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details. 
+4. Run tests: `make test`
+5. Format code: `make format`
+6. Run linting: `make lint`
+7. Submit a pull request
