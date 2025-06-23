@@ -26,6 +26,10 @@ def calculate_confidence(review):
 
 
 def format_console(review, show_confidence=False):
+    # Auto-detect if this is a PR description or a review
+    if "title" in review and "type" in review and "description" in review and "pr_files" in review:
+        return format_description_console(review)
+    # fallback to old review format
     console = Console()
 
     # Print summary if available
@@ -182,13 +186,75 @@ def format_json(review):
     return json.dumps(review, indent=2)
 
 
+def format_description_markdown(desc):
+    md = ["# PR Description\n"]
+    if "title" in desc:
+        md.append(f"## Title\n{desc['title']}\n")
+    if "type" in desc:
+        types_str = ", ".join(desc["type"]) if isinstance(desc["type"], list) else str(desc["type"])
+        md.append(f"## Type\n{types_str}\n")
+    if "description" in desc:
+        md.append(f"## Description\n{desc['description']}\n")
+    if "pr_files" in desc and desc["pr_files"]:
+        md.append("## Files Changed\n")
+        for file_info in desc["pr_files"]:
+            md.append(f"### {file_info.get('filename', 'Unknown')}")
+            if "changes_title" in file_info:
+                md.append(f"- **Title:** {file_info['changes_title']}")
+            if "changes_summary" in file_info:
+                md.append(f"- **Summary:**\n{file_info['changes_summary']}")
+            if "label" in file_info:
+                md.append(f"- **Label:** {file_info['label']}")
+            md.append("")
+    if "changes_diagram" in desc and desc["changes_diagram"]:
+        md.append("## Changes Diagram\n")
+        md.append(desc["changes_diagram"])
+    return "\n".join(md)
+
+
+def format_description_console(desc):
+    console = Console()
+    if "title" in desc:
+        console.print(Panel(desc["title"], title="📋 Title", box=ROUNDED, style="bold blue"))
+    if "type" in desc:
+        types_str = ", ".join(desc["type"]) if isinstance(desc["type"], list) else str(desc["type"])
+        console.print(Panel(types_str, title="🏷️ Type", box=ROUNDED, style="bold magenta"))
+    if "description" in desc:
+        console.print(
+            Panel(desc["description"], title="📝 Description", box=ROUNDED, style="bold green")
+        )
+    if "pr_files" in desc and desc["pr_files"]:
+        for file_info in desc["pr_files"]:
+            file_panel = f"[bold]File:[/bold] {file_info.get('filename', 'Unknown')}\n"
+            if "changes_title" in file_info:
+                file_panel += f"[bold]Title:[/bold] {file_info['changes_title']}\n"
+            if "changes_summary" in file_info:
+                file_panel += f"[bold]Summary:[/bold]\n{file_info['changes_summary']}\n"
+            if "label" in file_info:
+                file_panel += f"[bold]Label:[/bold] {file_info['label']}\n"
+            console.print(
+                Panel(file_panel, title="📄 File Change", box=ROUNDED, style="bold yellow")
+            )
+    if "changes_diagram" in desc and desc["changes_diagram"]:
+        console.print(
+            Panel(
+                desc["changes_diagram"], title="📊 Changes Diagram", box=ROUNDED, style="bold cyan"
+            )
+        )
+
+
 def format_markdown(review):
+    # Auto-detect if this is a PR description or a review
+    if "title" in review and "type" in review and "description" in review and "pr_files" in review:
+        return format_description_markdown(review)
+    # fallback to old review format
     md = ["# PR Review\n"]
-
-    # Summary
-    if review.get("summary"):
-        md.append(f"## Summary\n{review['summary']}\n")
-
+    print(review)
+    md.append(f"## Title\n{review.get('title', '')}\n")
+    md.append(f"## Type\n{review.get('type', '')}\n")
+    md.append(f"## Description\n{review.get('description', '')}\n")
+    if "changes_summary" in review:
+        md.append(f"## Change Summary\n{review['changes_summary']}\n")
     # Key issues
     issues = filter_duplicate_issues(review.get("key_issues_to_review", []))
     if issues:
@@ -196,14 +262,12 @@ def format_markdown(review):
         for i, issue in enumerate(issues, 1):
             severity = issue.get("severity", "medium")
             severity_emoji = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(severity, "⚪")
-
             md.append(f"### {severity_emoji} Issue #{i}: {issue.get('issue_header', 'No title')}")
             md.append(f"- **File:** `{issue.get('relevant_file', 'Unknown')}`")
             if issue.get("start_line") and issue.get("end_line"):
                 md.append(f"- **Lines:** {issue.get('start_line')}-{issue.get('end_line')}")
             md.append(f"- **Severity:** {severity.upper()}")
             md.append(f"- **Description:** {issue.get('issue_content', 'No content')}\n")
-
     # Technical analysis
     if review.get("technical_analysis"):
         tech = review["technical_analysis"]
@@ -216,7 +280,6 @@ def format_markdown(review):
             md.append(f"### Performance Implications\n{tech['performance_implications']}\n")
         if tech.get("error_handling"):
             md.append(f"### Error Handling\n{tech['error_handling']}\n")
-
     # Architectural consistency
     if review.get("architectural_consistency"):
         arch = review["architectural_consistency"]
@@ -227,20 +290,15 @@ def format_markdown(review):
             md.append(f"### Codebase Conventions\n{arch['codebase_conventions']}\n")
         if arch.get("integration_assessment"):
             md.append(f"### Integration Assessment\n{arch['integration_assessment']}\n")
-
     # Legacy fields
     if review.get("security_concerns") and review["security_concerns"] != "N/A":
         md.append(f"## Security Concerns\n{review['security_concerns']}\n")
-
     if review.get("performance_concerns") and review["performance_concerns"] != "N/A":
         md.append(f"## Performance Concerns\n{review['performance_concerns']}\n")
-
     if review.get("style_concerns") and review["style_concerns"] != "N/A":
         md.append(f"## Style Concerns\n{review['style_concerns']}\n")
-
     if review.get("suggestions_for_improvement"):
         md.append(f"## Suggestions for Improvement\n{review['suggestions_for_improvement']}\n")
-
     # Overall assessment
     if review.get("overall_assessment"):
         assessment = review["overall_assessment"]
@@ -254,15 +312,12 @@ def format_markdown(review):
                 md.append(f"### Recommendation\n{assessment['approval_recommendation'].upper()}\n")
         else:
             md.append(f"{assessment}\n")
-
     # Confidence
     confidence = calculate_confidence(review)
     if confidence:
         md.append(f"## Confidence\n{confidence}\n")
-
     # Summary
     md.append(f"## Summary\nTotal Issues: {len(issues)}")
-
     return "\n".join(md)
 
 

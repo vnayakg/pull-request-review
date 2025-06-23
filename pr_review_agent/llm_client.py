@@ -6,6 +6,10 @@ class LLMClient:
     def generate_review(self, prompt):
         raise NotImplementedError
 
+    def generate_description(self, prompt):
+        """Generate a PR description. By default, uses the same method as generate_review."""
+        return self.generate_review(prompt)
+
 
 class OllamaClient(LLMClient):
     def __init__(self, endpoint, model, temperature=0.1, max_tokens=2048):

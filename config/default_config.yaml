@@ -1,5 +1,5 @@
 llm:
-  type: gemini  # ollama, openai, gemini
+  type: ollama  # ollama, openai, gemini
 
 github:
   token: ${GITHUB_TOKEN}
@@ -7,7 +7,7 @@ github:
 
 ollama:
   endpoint: "http://localhost:11434"
-  model: "codellama:7b"
+  model: "phi4"
   temperature: 0.1
   max_tokens: 2048
 

@@ -7,7 +7,8 @@ A powerful CLI tool for reviewing GitHub pull requests using local or remote LLM
 - 🤖 **Multiple LLM Support**: Ollama (local), OpenAI, and Google Gemini
 - 🔍 **RAG Context**: Understands repository structure and existing code patterns
 - 📊 **Smart Analysis**: Provides contextual feedback based on codebase conventions
-- 🎯 **Flexible Output**: Console, JSON, or Markdown formats
+- 📝 **PR Description Generation**: Automatically generates clear, informative PR descriptions
+- 🎯 **Flexible Output**: Console, JSON, Markdown, or plain text formats
 - ⚡ **Caching**: Efficient repository indexing with persistent cache
 - 🔧 **Configurable**: YAML-based configuration with environment variable support
 
@@ -31,13 +32,35 @@ pip install -e .
 
 ```bash
 # Review a pull request
-pr-review-agent https://github.com/owner/repo/pull/123
+pr-review-agent review https://github.com/owner/repo/pull/123
+
+# Generate a description for a pull request
+pr-review-agent describe https://github.com/owner/repo/pull/123
 
 # With RAG context enabled
-pr-review-agent https://github.com/owner/repo/pull/123 --rag
+pr-review-agent review https://github.com/owner/repo/pull/123 --rag
 
 # Enhanced contextual review
-pr-review-agent https://github.com/owner/repo/pull/123 --rag --contextual
+pr-review-agent review https://github.com/owner/repo/pull/123 --rag --contextual
+```
+
+### PR Description Generation
+
+```bash
+# Generate a detailed description
+pr-review-agent describe https://github.com/owner/repo/pull/123
+
+# Generate a brief description
+pr-review-agent describe https://github.com/owner/repo/pull/123 --style brief
+
+# Generate a technical description
+pr-review-agent describe https://github.com/owner/repo/pull/123 --style technical
+
+# Output to file
+pr-review-agent describe https://github.com/owner/repo/pull/123 --output description.md --format markdown
+
+# With RAG context for better understanding
+pr-review-agent describe https://github.com/owner/repo/pull/123 --rag
 ```
 
 ### RAG Management
@@ -214,26 +237,43 @@ The RAG system enhances pull request reviews by:
 
 ```bash
 # Use custom config file
-pr-review-agent https://github.com/owner/repo/pull/123 -c my_config.yaml
+pr-review-agent review https://github.com/owner/repo/pull/123 -c my_config.yaml
 
 # Override model
-pr-review-agent https://github.com/owner/repo/pull/123 --model gpt-4
+pr-review-agent review https://github.com/owner/repo/pull/123 --model gpt-4
 
 # Output to file
-pr-review-agent https://github.com/owner/repo/pull/123 --output review.md --format markdown
+pr-review-agent review https://github.com/owner/repo/pull/123 --output review.md --format markdown
+```
+
+### PR Description Options
+
+```bash
+# Generate different description styles
+pr-review-agent describe https://github.com/owner/repo/pull/123 --style brief
+pr-review-agent describe https://github.com/owner/repo/pull/123 --style detailed
+pr-review-agent describe https://github.com/owner/repo/pull/123 --style technical
+
+# Output in different formats
+pr-review-agent describe https://github.com/owner/repo/pull/123 --format text --output description.txt
+pr-review-agent describe https://github.com/owner/repo/pull/123 --format markdown --output description.md
+pr-review-agent describe https://github.com/owner/repo/pull/123 --format json --output description.json
+
+# With RAG context for better understanding
+pr-review-agent describe https://github.com/owner/repo/pull/123 --rag --branch develop
 ```
 
 ### RAG Options
 
 ```bash
 # Use specific branch for context
-pr-review-agent https://github.com/owner/repo/pull/123 --rag --branch develop
+pr-review-agent review https://github.com/owner/repo/pull/123 --rag --branch develop
 
 # Force re-indexing
 pr-rag index https://github.com/owner/repo --force
 
 # Clear cache before review
-pr-review-agent https://github.com/owner/repo/pull/123 --rag --clear-cache
+pr-review-agent review https://github.com/owner/repo/pull/123 --rag --clear-cache
 ```
 
 ## Development
